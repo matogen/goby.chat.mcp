@@ -1,0 +1,49 @@
+{
+  "name": "goby-mcp",
+  "version": "0.2.0",
+  "description": "MCP server for the Goby public API v1 \u2014 list, create, update and comment on Goby tasks from Claude Code, with one API token per project directory",
+  "license": "MIT",
+  "author": "Matogen",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matogen/goby.chat.mcp.git"
+  },
+  "homepage": "https://github.com/matogen/goby.chat.mcp#readme",
+  "bugs": {
+    "url": "https://github.com/matogen/goby.chat.mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "goby",
+    "claude",
+    "claude-code",
+    "tasks"
+  ],
+  "type": "module",
+  "bin": {
+    "goby-mcp": "./build/index.js"
+  },
+  "files": [
+    "build",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc && chmod 755 build/index.js",
+    "test": "tsc && node --test 'build/**/*.test.js'",
+    "start": "node build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^16.4.7",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.9.3"
+  }
+}
