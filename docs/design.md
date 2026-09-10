@@ -2,7 +2,7 @@
 
 ## Purpose
 Let Claude (Claude Code, Desktop) create, read, update and comment on Goby tasks
-the same way the existing `jira-mcp` server does for Jira. One stdio MCP server,
+from any MCP client. One stdio MCP server,
 one Goby team per API key, one key per project directory.
 
 ## Configuration
