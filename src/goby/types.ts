@@ -33,7 +33,7 @@ export interface Task {
   title: string;
   description: string | null;
   status: { id: string; name: string; semantic: Semantic } | null;
-  priority: 1 | 2 | 3 | null;
+  priority: number | null;
   dueAt: string | null;
   estimateHours: number | null;
   assignees: { id: string; name: string | null }[];
@@ -55,7 +55,7 @@ export interface CreateTask {
   title: string;
   description?: string;
   statusId?: string;
-  priority?: 1 | 2 | 3 | null;
+  priority?: number | null;
   dueAt?: string | null;
   assigneeIds?: string[];
   labelIds?: string[];
@@ -66,7 +66,7 @@ export interface UpdateTask {
   title?: string;
   description?: string | null;
   statusId?: string;
-  priority?: 1 | 2 | 3 | null;
+  priority?: number | null;
   dueAt?: string | null;
   assigneeIds?: string[];
   labelIds?: string[];

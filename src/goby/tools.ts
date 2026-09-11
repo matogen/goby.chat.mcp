@@ -36,7 +36,10 @@ const guarded =
   };
 
 const semantic = z.enum(["todo", "in_progress", "blocked", "done"]);
-const priority = z.number().int().min(1).max(3);
+// A rank on the team's priority scale (1 = most urgent). Teams start
+// with P1..P3 and may rename or extend the scale; the api refuses a
+// rank the team does not have.
+const priority = z.number().int().min(1);
 const isoDate = z
   .string()
   .describe("ISO 8601 timestamp, e.g. 2026-09-01T00:00:00Z (a bare date like 2026-09-01 is accepted too)");
@@ -236,12 +239,12 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
     {
       title: "Create task",
       description:
-        "Create a Goby task. The key (e.g. OPS-43) is assigned by the server. Status, assignees and labels accept friendly values (semantic/name, email/name, label name) as well as uuids. Goby has no issue types or sprints — use priority (1 highest … 3) and labels.",
+        "Create a Goby task. The key (e.g. OPS-43) is assigned by the server. Status, assignees and labels accept friendly values (semantic/name, email/name, label name) as well as uuids. Goby has no issue types or sprints — use priority (a rank on the team's scale, 1 highest; teams start with P1..P3) and labels.",
       inputSchema: {
         title: z.string().min(1).max(200),
         description: z.string().max(10000).optional().describe("Becomes the task's opening message (markdown)"),
         status: z.string().optional().describe("Status uuid, semantic (todo|in_progress|blocked|done) or column name. Defaults to the team's first todo column"),
-        priority: priority.optional().describe("1 (highest) to 3"),
+        priority: priority.optional().describe("Rank on the team's priority scale, 1 = most urgent (teams start with P1..P3)"),
         due_at: isoDate.optional(),
         assignees: z.array(z.string()).optional().describe("Member uuids, emails or names"),
         labels: z.array(z.string()).optional().describe("Label uuids or names (must already exist on some task)"),
@@ -253,7 +256,7 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
       const body: CreateTask = { title: a.title };
       if (a.description !== undefined) body.description = a.description;
       if (a.status) body.statusId = resolveStatus(a.status, await statuses());
-      if (a.priority !== undefined) body.priority = a.priority as 1 | 2 | 3;
+      if (a.priority !== undefined) body.priority = a.priority;
       if (a.due_at) body.dueAt = toIso(a.due_at);
       if (a.assignees?.length) body.assigneeIds = await resolveAssignees(a.assignees);
       if (a.labels?.length) body.labelIds = await resolveLabels(a.labels);
@@ -290,7 +293,7 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
       if (a.title !== undefined) body.title = a.title;
       if (a.description !== undefined) body.description = a.description;
       if (a.status) body.statusId = resolveStatus(a.status, await statuses());
-      if (a.priority !== undefined) body.priority = a.priority as 1 | 2 | 3;
+      if (a.priority !== undefined) body.priority = a.priority;
       if (a.due_at) body.dueAt = toIso(a.due_at);
       if (a.assignees !== undefined) body.assigneeIds = a.assignees.length ? await resolveAssignees(a.assignees) : [];
       if (a.labels !== undefined) body.labelIds = a.labels.length ? await resolveLabels(a.labels) : [];
