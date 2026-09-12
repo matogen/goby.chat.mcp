@@ -1,4 +1,4 @@
-import type { Comment, HistoryEntry, Task, Webhook } from "./types.js";
+import type { Comment, Deliverable, HistoryEntry, Task, Webhook } from "./types.js";
 
 const day = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
 
@@ -30,6 +30,9 @@ export function formatTask(t: Task): string {
   if (t.parentKey) lines.push(`Parent: ${t.parentKey}`);
   if (t.childCount) lines.push(`Children: ${t.childCount}`);
   if (t.externalKey) lines.push(`External key: ${t.externalKey}`);
+  if (t.customFields?.length) {
+    lines.push(`Custom fields: ${t.customFields.map((f) => `${f.name}=${f.value}`).join(", ")}`);
+  }
   lines.push(`Created: ${t.createdAt}`, `Updated: ${t.updatedAt}`);
   if (t.url) lines.push(`URL: ${t.url}`);
   lines.push("", "Description:", t.description ?? "(none)");
@@ -71,4 +74,11 @@ export function formatWebhook(w: Webhook): string {
     `  events: ${w.events.join(", ")}`,
     `  last success: ${w.lastSuccessAt ?? "never"} | last failure: ${w.lastFailureAt ?? "never"} | created: ${w.createdAt}`,
   ].join("\n");
+}
+
+export function formatDeliverable(d: Deliverable): string {
+  const parts = [`${d.position}.`, `[${d.state}]`, d.title, `(${d.id})`];
+  if (d.description) parts.push(`— ${d.description}`);
+  if (d.artifactId) parts.push(`file:${d.artifactId}`);
+  return parts.join(" ");
 }

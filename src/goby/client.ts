@@ -13,6 +13,9 @@ import type {
   UpdateWebhook,
   Webhook,
   Whoami,
+  CreateDeliverable,
+  Deliverable,
+  UpdateDeliverable,
 } from "./types.js";
 
 export type GobyErrorCode =
@@ -162,6 +165,22 @@ export class GobyClient {
 
   getHistory(key: string, q: { limit?: number; cursor?: string } = {}): Promise<HistoryPage> {
     return this.request("GET", `/tasks/${encodeURIComponent(key)}/history`, { query: q });
+  }
+
+  listDeliverables(key: string): Promise<Deliverable[]> {
+    return this.request<Deliverable[]>("GET", `/tasks/${encodeURIComponent(key)}/deliverables`);
+  }
+
+  createDeliverable(key: string, body: CreateDeliverable): Promise<Deliverable> {
+    return this.request<Deliverable>("POST", `/tasks/${encodeURIComponent(key)}/deliverables`, { body });
+  }
+
+  updateDeliverable(key: string, id: string, body: UpdateDeliverable): Promise<Deliverable> {
+    return this.request<Deliverable>(
+      "PATCH",
+      `/tasks/${encodeURIComponent(key)}/deliverables/${encodeURIComponent(id)}`,
+      { body },
+    );
   }
 
   listStatuses(): Promise<Status[]> {

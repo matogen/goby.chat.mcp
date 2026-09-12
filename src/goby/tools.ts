@@ -1,9 +1,22 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { GobyApiError, GobyClient } from "./client.js";
-import { formatComment, formatHistoryEntry, formatTask, formatTaskLine, formatWebhook } from "./format.js";
+import {
+  formatComment,
+  formatDeliverable,
+  formatHistoryEntry,
+  formatTask,
+  formatTaskLine,
+  formatWebhook,
+} from "./format.js";
 import { resolveLabel, resolveMember, resolveStatus } from "./resolve.js";
-import { WEBHOOK_EVENTS, type CreateTask, type Label, type UpdateTask } from "./types.js";
+import {
+  WEBHOOK_EVENTS,
+  type CreateTask,
+  type Label,
+  type UpdateDeliverable,
+  type UpdateTask,
+} from "./types.js";
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
 
@@ -249,6 +262,10 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
         assignees: z.array(z.string()).optional().describe("Member uuids, emails or names"),
         labels: z.array(z.string()).optional().describe("Label uuids or names (must already exist on some task)"),
         estimate_hours: z.number().nonnegative().optional(),
+        custom_fields: z
+          .record(z.string().min(1).max(64), z.string().max(2000))
+          .optional()
+          .describe("Named values to set on the new task, e.g. {\"cellphone\": \"072…\"}"),
         idempotency_key: z.string().max(200).optional().describe("Send the same key on a retry to avoid creating the task twice"),
       },
     },
@@ -261,6 +278,7 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
       if (a.assignees?.length) body.assigneeIds = await resolveAssignees(a.assignees);
       if (a.labels?.length) body.labelIds = await resolveLabels(a.labels);
       if (a.estimate_hours !== undefined) body.estimateHours = a.estimate_hours;
+      if (a.custom_fields) body.customFields = a.custom_fields;
       const t = await client().createTask(body, a.idempotency_key);
       return ok(`Created ${t.key}${t.url ? ` — ${t.url}` : ""}\n\n${formatTask(t)}`);
     })
@@ -282,6 +300,11 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
         assignees: z.array(z.string()).optional().describe("Replaces the assignee set. Member uuids, emails or names; [] to unassign"),
         labels: z.array(z.string()).optional().describe("Replaces the label set. Label uuids or names; [] to remove all"),
         estimate_hours: z.number().nonnegative().optional(),
+        custom_fields: z
+          .record(z.string().min(1).max(64), z.string().max(2000))
+          .optional()
+          .describe("Named values to set, e.g. {\"cellphone\": \"072…\"}. Merged by name; other fields untouched. Names: lower-case letters, digits, _ . -"),
+        clear_custom_fields: z.array(z.string()).optional().describe("Field names to remove"),
         clear_description: z.boolean().optional(),
         clear_priority: z.boolean().optional(),
         clear_due_at: z.boolean().optional(),
@@ -298,6 +321,10 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
       if (a.assignees !== undefined) body.assigneeIds = a.assignees.length ? await resolveAssignees(a.assignees) : [];
       if (a.labels !== undefined) body.labelIds = a.labels.length ? await resolveLabels(a.labels) : [];
       if (a.estimate_hours !== undefined) body.estimateHours = a.estimate_hours;
+      if (a.custom_fields || a.clear_custom_fields) {
+        body.customFields = { ...(a.custom_fields ?? {}) };
+        for (const name of a.clear_custom_fields ?? []) body.customFields[name] = null;
+      }
       if (a.clear_description) body.description = null;
       if (a.clear_priority) body.priority = null;
       if (a.clear_due_at) body.dueAt = null;
@@ -364,6 +391,72 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
       const lines = page.history.map(formatHistoryEntry);
       if (page.nextCursor) lines.push("", `More results — pass cursor: ${page.nextCursor}`);
       return ok(lines.join("\n"));
+    })
+  );
+
+  // ---- deliverables -----------------------------------------------------
+
+  const deliverableState = z.enum(["awaiting_intake", "in_progress", "generated"]);
+
+  server.registerTool(
+    "list-deliverables",
+    {
+      title: "List deliverables",
+      description:
+        "What a task owes: its deliverables (documents, reports, files) with state — awaiting_intake, in_progress, generated — and panel position.",
+      inputSchema: { key: z.string().min(1).describe("Task key like OPS-42") },
+    },
+    guarded(async (a) => {
+      const list = await client().listDeliverables(a.key);
+      if (!list.length) return ok(`${a.key} has no deliverables.`);
+      return ok(list.map(formatDeliverable).join("\n"));
+    })
+  );
+
+  server.registerTool(
+    "add-deliverable",
+    {
+      title: "Add deliverable",
+      description: "Add a deliverable to a task (appended last). Needs tasks:write and a key whose owner participates in the task or leads the team.",
+      inputSchema: {
+        key: z.string().min(1).describe("Task key like OPS-42"),
+        title: z.string().min(1).max(300),
+        description: z.string().max(2000).optional().describe("What it needs / covers"),
+      },
+    },
+    guarded(async (a) => {
+      const created = await client().createDeliverable(a.key, {
+        title: a.title,
+        description: a.description,
+      });
+      return ok(`Added: ${formatDeliverable(created)}`);
+    })
+  );
+
+  server.registerTool(
+    "update-deliverable",
+    {
+      title: "Update deliverable",
+      description: "Rename, describe, move or change the state of a deliverable. Omitted fields are untouched; clear_description sends null.",
+      inputSchema: {
+        key: z.string().min(1).describe("Task key like OPS-42"),
+        id: z.string().uuid().describe("The deliverable id (from list-deliverables)"),
+        title: z.string().min(1).max(300).optional(),
+        description: z.string().max(2000).optional(),
+        state: deliverableState.optional(),
+        position: z.number().int().min(1).optional(),
+        clear_description: z.boolean().optional(),
+      },
+    },
+    guarded(async (a) => {
+      const body: UpdateDeliverable = {};
+      if (a.title !== undefined) body.title = a.title;
+      if (a.description !== undefined) body.description = a.description;
+      if (a.state !== undefined) body.state = a.state;
+      if (a.position !== undefined) body.position = a.position;
+      if (a.clear_description) body.description = null;
+      const updated = await client().updateDeliverable(a.key, a.id, body);
+      return ok(`Updated: ${formatDeliverable(updated)}`);
     })
   );
 

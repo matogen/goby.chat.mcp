@@ -16,6 +16,7 @@ const task: Task = {
   labels: [{ id: "l", name: "infra", color: "#000" }],
   parentKey: null,
   childCount: 0,
+  customFields: [],
   externalKey: "JIRA-123",
   createdAt: "2026-08-20T09:30:00.000Z",
   updatedAt: "2026-08-27T08:00:00.000Z",

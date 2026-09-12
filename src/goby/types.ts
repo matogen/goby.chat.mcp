@@ -41,6 +41,8 @@ export interface Task {
   parentKey: string | null;
   childCount: number;
   externalKey: string | null;
+  /** Named values on the task (name → text), sorted by name. */
+  customFields: { name: string; value: string }[];
   createdAt: string;
   updatedAt: string;
   url: string;
@@ -60,6 +62,7 @@ export interface CreateTask {
   assigneeIds?: string[];
   labelIds?: string[];
   estimateHours?: number | null;
+  customFields?: Record<string, string>;
 }
 
 export interface UpdateTask {
@@ -71,6 +74,8 @@ export interface UpdateTask {
   assigneeIds?: string[];
   labelIds?: string[];
   estimateHours?: number | null;
+  /** Merge by name; null removes a field. */
+  customFields?: Record<string, string | null>;
 }
 
 export interface Comment {
@@ -156,4 +161,31 @@ export interface ListTasksQuery {
   direction?: "asc" | "desc";
   limit?: number;
   cursor?: string;
+}
+
+export type DeliverableState = "awaiting_intake" | "in_progress" | "generated";
+
+export interface Deliverable {
+  id: string;
+  taskKey: string;
+  title: string;
+  description: string | null;
+  state: DeliverableState;
+  position: number;
+  artifactId: string | null;
+  createdBy: "user" | "agent";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDeliverable {
+  title: string;
+  description?: string;
+}
+
+export interface UpdateDeliverable {
+  title?: string;
+  description?: string | null;
+  state?: DeliverableState;
+  position?: number;
 }

@@ -87,10 +87,13 @@ A `.env` in the project directory is also read (see `.env.example`).
 | `list-tasks` | Search/filter: status, semantic, assignee, unassigned, label, keys, updated_since/before, include_done, q, sort, paging |
 | `get-task` | One task by key (`OPS-42`) with description |
 | `create-task` | Create a task; `status`/`assignees`/`labels` accept names, emails, semantics or uuids |
-| `update-task` | PATCH any subset; `clear_*` flags send `null` |
+| `update-task` | PATCH any subset; `clear_*` flags send `null`; `custom_fields` / `clear_custom_fields` merge the task's named values |
 | `get-comments` | Task thread (needs `comments:read`) |
 | `add-comment` | Post a note. **Does not wake the Goby agent unless `start_agent_run: true`** |
 | `get-task-history` | Status / assignee / due-date transitions |
+| `list-deliverables` | What a task owes: its deliverables with state and position |
+| `add-deliverable` | Add a deliverable (title, optional description) to a task |
+| `update-deliverable` | Rename, describe, move or change the state of a deliverable |
 | `list-webhooks`, `create-webhook`, `update-webhook`, `delete-webhook` | Webhook endpoints (needs `webhooks:write`); secret shown once on create |
 | `list-project-tokens` | Which (masked) token is active for this directory, where it came from, all stored tokens |
 | `set-project-token` | Store a `gk_` key (and `base_url`) for a project directory, default the current one |
