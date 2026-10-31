@@ -71,6 +71,31 @@ function toIso(v: string): string {
  */
 export type ClientProvider = () => GobyClient;
 
+/**
+ * The team's labels: GET /labels (every label, used or not). A server
+ * older than that endpoint answers 404, and then the labels are
+ * harvested from the tasks the key can see — which misses labels no
+ * task carries yet.
+ */
+export async function teamLabels(
+  c: Pick<GobyClient, "listLabels" | "listTasks">
+): Promise<{ labels: Label[]; harvested: boolean }> {
+  try {
+    return { labels: await c.listLabels(), harvested: false };
+  } catch (e) {
+    if (!(e instanceof GobyApiError && e.status === 404)) throw e;
+  }
+  const seen = new Map<string, Label>();
+  let cursor: string | undefined;
+  for (let page = 0; page < 5; page++) {
+    const r = await c.listTasks({ includeDone: true, limit: 100, cursor });
+    for (const t of r.tasks) for (const l of t.labels) seen.set(l.id, l);
+    if (!r.nextCursor) break;
+    cursor = r.nextCursor;
+  }
+  return { labels: [...seen.values()], harvested: true };
+}
+
 export function registerGobyTools(server: McpServer, getClient: ClientProvider) {
   // Small per-process caches: statuses and members change rarely. They are
   // tied to the client instance they were fetched with, so a token change
@@ -90,18 +115,7 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
   const statuses = () => (statusesCache ??= client().listStatuses().catch((e) => { statusesCache = null; throw e; }));
   const members = () => (membersCache ??= client().listMembers().catch((e) => { membersCache = null; throw e; }));
 
-  /** There is no /labels endpoint: harvest labels from the tasks the key can see. */
-  async function knownLabels(): Promise<Label[]> {
-    const seen = new Map<string, Label>();
-    let cursor: string | undefined;
-    for (let page = 0; page < 5; page++) {
-      const r = await client().listTasks({ includeDone: true, limit: 100, cursor });
-      for (const t of r.tasks) for (const l of t.labels) seen.set(l.id, l);
-      if (!r.nextCursor) break;
-      cursor = r.nextCursor;
-    }
-    return [...seen.values()];
-  }
+  const knownLabels = () => teamLabels(client());
 
   async function resolveAssignees(values: string[]): Promise<string[]> {
     const ms = await members();
@@ -109,8 +123,8 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
   }
 
   async function resolveLabels(values: string[]): Promise<string[]> {
-    const ls = await knownLabels();
-    return values.map((v) => resolveLabel(v, ls));
+    const { labels } = await knownLabels();
+    return values.map((v) => resolveLabel(v, labels));
   }
 
   // ---- identity ---------------------------------------------------------
@@ -175,12 +189,36 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
     {
       title: "List labels",
       description:
-        "Labels in use on the team's tasks (harvested from existing tasks — Goby has no labels endpoint, so a label nobody has used yet will not appear).",
+        "Every label on the team (name, color, id), including labels no task uses yet — the legal label values for create-task / update-task / list-tasks. Use create-label to add one.",
       inputSchema: {},
     },
     guarded(async () => {
-      const ls = await knownLabels();
-      return ok(ls.length ? ls.map((l) => `${l.name} (${l.color}) id=${l.id}`).join("\n") : "No labels found on any visible task.");
+      const { labels, harvested } = await knownLabels();
+      const lines = labels.map((l) => `${l.name} (${l.color}) id=${l.id}`);
+      // An older Goby without GET /labels: say the list is partial.
+      if (harvested) lines.push("(This Goby server has no labels endpoint; showing only labels used on visible tasks.)");
+      return ok(lines.length ? lines.join("\n") : "The team has no labels yet. Use create-label to add one.");
+    })
+  );
+
+  server.registerTool(
+    "create-label",
+    {
+      title: "Create a label",
+      description:
+        "Make sure the team has a label with this name. Idempotent: if one already exists (case-insensitively) it is returned instead of a duplicate. Creating a new label needs a key owned by a team lead (tasks:write scope).",
+      inputSchema: {
+        name: z.string().trim().min(1).max(40).describe("Label name, 1–40 characters"),
+        color: z
+          .string()
+          .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+          .optional()
+          .describe("Hex color, e.g. #25d366; the server defaults to a neutral grey"),
+      },
+    },
+    guarded(async (a: { name: string; color?: string }) => {
+      const { label, created } = await client().createLabel({ name: a.name, color: a.color });
+      return ok(`${created ? "Created" : "Already exists"}: ${label.name} (${label.color}) id=${label.id}`);
     })
   );
 
@@ -260,7 +298,7 @@ export function registerGobyTools(server: McpServer, getClient: ClientProvider) 
         priority: priority.optional().describe("Rank on the team's priority scale, 1 = most urgent (teams start with P1..P3)"),
         due_at: isoDate.optional(),
         assignees: z.array(z.string()).optional().describe("Member uuids, emails or names"),
-        labels: z.array(z.string()).optional().describe("Label uuids or names (must already exist on some task)"),
+        labels: z.array(z.string()).optional().describe("Label uuids or names (see list-labels; create-label adds one)"),
         estimate_hours: z.number().nonnegative().optional(),
         custom_fields: z
           .record(z.string().min(1).max(64), z.string().max(2000))

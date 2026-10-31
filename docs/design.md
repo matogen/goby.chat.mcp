@@ -48,6 +48,8 @@ src/cli.ts            `goby-mcp token …` subcommands
 | `get-task-history` | GET /tasks/{key}/history | |
 | `list-statuses` | GET /statuses | |
 | `list-members` | GET /members | |
+| `list-labels` | GET /labels | 404 (older server) → harvest labels from tasks; also the source for label-name resolution |
+| `create-label` | POST /labels | idempotent by name; 201 created / 200 already existed |
 | `list-webhooks` / `create-webhook` / `update-webhook` / `delete-webhook` | /webhooks | secret surfaced once on create |
 
 ## Error handling

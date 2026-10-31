@@ -4,6 +4,7 @@ import type {
   CreateTask,
   CreateWebhook,
   HistoryPage,
+  Label,
   ListTasksQuery,
   Member,
   Status,
@@ -81,9 +82,18 @@ export class GobyClient {
   private async request<T>(
     method: string,
     path: string,
+    opts: { query?: Query; body?: unknown; headers?: Record<string, string> } = {}
+  ): Promise<T> {
+    return (await this.send<T>(method, path, opts)).body;
+  }
+
+  /** `request`, keeping the HTTP status — for the one route whose status means something (POST /labels: 201 new, 200 existing). */
+  private async send<T>(
+    method: string,
+    path: string,
     opts: { query?: Query; body?: unknown; headers?: Record<string, string> } = {},
     attempt = 0
-  ): Promise<T> {
+  ): Promise<{ status: number; body: T }> {
     const headers: Record<string, string> = {
       authorization: `Bearer ${this.apiKey}`,
       accept: "application/json",
@@ -99,7 +109,7 @@ export class GobyClient {
 
     if (res.status === 429 && attempt === 0) {
       await this.sleep(this.backoff);
-      return this.request<T>(method, path, opts, attempt + 1);
+      return this.send<T>(method, path, opts, attempt + 1);
     }
 
     const text = await res.text();
@@ -120,7 +130,7 @@ export class GobyClient {
       throw new GobyApiError(res.status, code, message);
     }
 
-    return json as T;
+    return { status: res.status, body: json as T };
   }
 
   // ---- endpoints --------------------------------------------------------
@@ -189,6 +199,17 @@ export class GobyClient {
 
   listMembers(): Promise<Member[]> {
     return this.request("GET", "/members");
+  }
+
+  /** Every label on the team. Servers older than the endpoint answer 404. */
+  listLabels(): Promise<Label[]> {
+    return this.request("GET", "/labels");
+  }
+
+  /** Idempotent by name (case-insensitive): `created` is false when the team already had it. */
+  async createLabel(body: { name: string; color?: string }): Promise<{ label: Label; created: boolean }> {
+    const r = await this.send<Label>("POST", "/labels", { body });
+    return { label: r.body, created: r.status === 201 };
   }
 
   async listWebhooks(): Promise<Webhook[]> {

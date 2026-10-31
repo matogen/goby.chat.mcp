@@ -21,7 +21,7 @@ if (argv[0] === "token" || argv[0] === "--help" || argv[0] === "-h") {
 
 const cwd = process.cwd();
 const store = new TokenStore(storePath());
-const server = new McpServer({ name: "goby-mcp", version: "0.2.0" });
+const server = new McpServer({ name: "goby-mcp", version: "0.3.0" });
 
 // One client per distinct (baseUrl, apiKey); re-resolved on every call so a
 // token stored while the server runs is picked up without a restart.

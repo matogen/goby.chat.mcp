@@ -87,3 +87,25 @@ test("deleteWebhook tolerates an empty 204", async () => {
   assert.equal(calls[0].init.method, "DELETE");
   assert.equal(calls[0].url, "https://x.goby.chat/api/v1/webhooks/abc");
 });
+
+test("listLabels reads GET /labels", async () => {
+  const labels = [{ id: "l1", name: "unused", color: "#8696a0" }];
+  const { fetch, calls } = fakeFetch([{ status: 200, body: labels }]);
+  const c = new GobyClient({ ...cfg, fetch, sleep: async () => {} });
+  assert.deepEqual(await c.listLabels(), labels);
+  assert.equal(calls[0].url, "https://x.goby.chat/api/v1/labels");
+});
+
+test("createLabel POSTs /labels and reports 201 as created, 200 as existing", async () => {
+  const label = { id: "l1", name: "billing", color: "#8696a0" };
+  const { fetch, calls } = fakeFetch([
+    { status: 201, body: label },
+    { status: 200, body: label },
+  ]);
+  const c = new GobyClient({ ...cfg, fetch, sleep: async () => {} });
+  assert.deepEqual(await c.createLabel({ name: "billing" }), { label, created: true });
+  assert.deepEqual(await c.createLabel({ name: "Billing" }), { label, created: false });
+  assert.equal(calls[0].init.method, "POST");
+  assert.equal(calls[0].url, "https://x.goby.chat/api/v1/labels");
+  assert.deepEqual(JSON.parse(String(calls[0].init.body)), { name: "billing" });
+});

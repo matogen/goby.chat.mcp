@@ -1,6 +1,6 @@
 {
   "name": "goby-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for the Goby public API v1 \u2014 list, create, update and comment on Goby tasks from Claude Code, with one API token per project directory",
   "license": "MIT",
   "author": "Matogen",

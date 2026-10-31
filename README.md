@@ -83,10 +83,11 @@ A `.env` in the project directory is also read (see `.env.example`).
 | `whoami` | Verify the active key; learn team, key prefix, scopes, owner |
 | `list-statuses` | Board columns (legal status values) |
 | `list-members` | Team members (legal assignees) — match by email |
-| `list-labels` | Labels seen on existing tasks (Goby has no labels endpoint) |
+| `list-labels` | Every label on the team, used or not (falls back to labels seen on tasks on older Goby servers) |
+| `create-label` | Make sure a label exists — idempotent by name; minting needs a lead-owned key |
 | `list-tasks` | Search/filter: status, semantic, assignee, unassigned, label, keys, updated_since/before, include_done, q, sort, paging |
 | `get-task` | One task by key (`OPS-42`) with description |
-| `create-task` | Create a task; `status`/`assignees`/`labels` accept names, emails, semantics or uuids |
+| `create-task` | Create a task; `status`/`assignees`/`labels` accept names, emails, semantics or uuids (label names resolve against the team's full label list) |
 | `update-task` | PATCH any subset; `clear_*` flags send `null`; `custom_fields` / `clear_custom_fields` merge the task's named values |
 | `get-comments` | Task thread (needs `comments:read`) |
 | `add-comment` | Post a note. **Does not wake the Goby agent unless `start_agent_run: true`** |

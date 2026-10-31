@@ -46,6 +46,6 @@ export function resolveLabel(value: string, labels: Label[]): string {
   const v = value.trim().toLowerCase();
   const hit = labels.find((l) => l.name.trim().toLowerCase() === v);
   if (hit) return hit.id;
-  const legal = labels.map((l) => l.name).join(", ") || "(none found on existing tasks)";
+  const legal = labels.map((l) => l.name).join(", ") || "(none — use create-label)";
   throw new Error(`Unknown label "${value}". Known labels: ${legal}`);
 }
